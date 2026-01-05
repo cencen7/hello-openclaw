@@ -27,3 +27,166 @@ GameSet
 
 电面，网球比赛那道题，两问。第一问写了个game的class，第二问写了个match的class然后在里面build game object
 """
+
+from __future__ import annotations
+from dataclasses import dataclass
+from enum import Enum
+from typing import Iterable, Iterator, Optional, Tuple, List
+
+
+class Player(str, Enum):
+    A = "A"
+    B = "B"
+
+
+@dataclass
+class Game:
+    a: int = 0
+    b: int = 0
+
+    def point(self, winner: Player) -> None:
+        """Add one point to winner. Illegal if game already ended."""
+        if self.winner() is not None:
+            raise RuntimeError("Game already has a winner")
+
+        if winner == Player.A:
+            self.a += 1
+        elif winner == Player.B:
+            self.b += 1
+        else:
+            raise ValueError("Invalid player")
+
+        # Custom rule: if tied and both > 3, reset to 3-3
+        if self.a == self.b and self.a > 3:
+            self.a = self.b = 3
+
+    def score(self) -> Tuple[int, int]:
+        return self.a, self.b
+
+    def winner(self) -> Optional[Player]:
+        """Return winner if exists, else None (normal state)."""
+        if self.a >= 5 and self.a - self.b >= 2:
+            return Player.A
+        if self.b >= 5 and self.b - self.a >= 2:
+            return Player.B
+        return None
+
+
+@dataclass
+class Match:
+    max_games: int = 5
+    games_to_win: int = 3
+
+    def play(self, point_winners: Iterable[Player]) -> Player:
+        it: Iterator[Player] = iter(point_winners)
+        a_games = b_games = 0
+        games_played = 0
+
+        while games_played < self.max_games and a_games < self.games_to_win and b_games < self.games_to_win:
+            game = Game()
+
+            # play a single game until it ends
+            gw: Optional[Player] = None
+            while gw is None:
+                try:
+                    p = next(it)
+                except StopIteration:
+                    raise RuntimeError("Not enough points to finish the match")
+                game.point(p)
+                gw = game.winner()
+
+            # record game winner
+            if gw == Player.A:
+                a_games += 1
+            else:
+                b_games += 1
+            games_played += 1
+
+        # decide match winner
+        if a_games >= self.games_to_win:
+            return Player.A
+        if b_games >= self.games_to_win:
+            return Player.B
+
+        # max games reached: higher games wins
+        if a_games > b_games:
+            return Player.A
+        if b_games > a_games:
+            return Player.B
+
+        raise RuntimeError("Match ended tied (unexpected under these rules)")
+
+
+# ---------------- Tests ----------------
+
+def assert_raises(expected_exc, fn, msg=""):
+    try:
+        fn()
+    except expected_exc:
+        return
+    except Exception as e:
+        raise AssertionError(f"{msg} Expected {expected_exc.__name__}, got {type(e).__name__}: {e}") from e
+    raise AssertionError(f"{msg} Expected {expected_exc.__name__} but no exception was raised.")
+
+
+def make_game_points(winner: Player) -> List[Player]:
+    # Bring to 3:3 then winner wins two points => 5:3
+    seq: List[Player] = []
+    for _ in range(3):
+        seq += [Player.A, Player.B]
+    seq += [winner, winner]
+    return seq
+
+
+def test_game_reset_at_4_4():
+    g = Game()
+    for _ in range(4):
+        g.point(Player.A)
+        g.point(Player.B)
+    assert g.score() == (3, 3)
+
+
+def test_game_win_and_no_more_points():
+    g = Game()
+    for p in make_game_points(Player.A):
+        g.point(p)
+    assert g.score() == (5, 3)
+    assert g.winner() == Player.A
+    assert_raises(RuntimeError, lambda: g.point(Player.B), "cannot point after game ends. ")
+
+
+def test_match_a_wins_3_0():
+    m = Match()
+    points = make_game_points(Player.A) * 3
+    assert m.play(points) == Player.A
+
+
+def test_match_b_wins_3_2():
+    m = Match()
+    points = (
+        make_game_points(Player.A) +
+        make_game_points(Player.B) +
+        make_game_points(Player.A) +
+        make_game_points(Player.B) +
+        make_game_points(Player.B)
+    )
+    assert m.play(points) == Player.B
+
+
+def test_match_runs_out_of_points():
+    m = Match()
+    points = make_game_points(Player.A)  # only enough for 1 game
+    assert_raises(RuntimeError, lambda: m.play(points), "should run out of points. ")
+
+
+def run_all_tests():
+    test_game_reset_at_4_4()
+    test_game_win_and_no_more_points()
+    test_match_a_wins_3_0()
+    test_match_b_wins_3_2()
+    test_match_runs_out_of_points()
+    print("All tests passed ✅")
+
+
+if __name__ == "__main__":
+    run_all_tests()
