@@ -47,4 +47,7 @@ Coding 3: IP to CIDR 变种
 System Design: 设计file system，支持create dir，list dir，put file， get file etc，如果存的文件特别大如何handle
 ---
 follow up input 从ip 变成cidr。 解法类似range module。他家follow up不用写出来应该也是能过的。
+---
+每个CIDR支持 Allow，Deny
+Follow-up: 如何Scale?
 """

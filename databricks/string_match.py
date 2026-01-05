@@ -17,4 +17,9 @@ coding ref string和source string，
 注意不是optimal cover。第二个coding是BFS找最节约的交通方式in 2D matrix， 
 每个grid有cost，每种交通方式不可以互换，比如bike，walk，bus是三种cost，
 一但选择了就不可以换成另一种交通，比较基础的BFS
+---
+https://leetcode.com/discuss/post/897537/facebook-phone-anagram-substring-search-kpaiq/
+
+--
+https://leetcode.com/problems/number-of-matching-subsequences/description/ 
 """

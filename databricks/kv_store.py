@@ -34,5 +34,6 @@ algorithm 考了 kv store 算 qps， followup 问了求任意时间怎么做（�
 ---
 Hashmap QPS. 不要求thread safe，很多followup，比如高效查询不止最近5分钟的hit count，要最近24小时之类的，讨论使用不同数据结构实现的tradeoffs
 
-
+----
+durable KV store, 印度staff manager迟到十多分钟， 首先质疑我为啥懂wal， 然后我做任何改动都质疑一下，前半部分不准我想任何多线程解决方案，浪费很多时间，以至于最后加锁部分简单写了， 无锁concurrency部分只能口述，我说了乐观锁， 然后feedback ：concurency部分code写少了。
 """

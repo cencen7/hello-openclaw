@@ -149,4 +149,11 @@ Return the name of the transportation mode that yields the minimum total time fr
 
 --
 https://www.1point3acres.com/home/pins/887099
+---
+前几周面的Databrick 店面， 考的find optimal commute 原题。 找出从起点到终点花费时间最短的模式。 如果时间相同就花费最小的模式，例如bike， walk， car之类的。 给了一个 matrix，里面 “1”“2”“3”“4” 表不同的交通模式，还给了cost和time array for each mode.
+
+上来提出用min-heap 来存每个cell 从起点开始的
+(累计时间, 累计cost)
+
+，扫一遍matrix 拿到最优模式。面试官不同意，觉得time complexity不好。 我在提出用 BFS for each mode, 得跑4遍 ，面试官觉得最好跑一遍 BFS就行。来回沟通半天，最后我也只会写跑4遍的BFS， 还没剩时间跑test了。
 """

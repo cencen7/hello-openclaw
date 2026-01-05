@@ -101,3 +101,224 @@ return user_billing_status
 第二问加了overwrite后output不对，那个log又臭又长很难检查，加上时间不够有点紧张，最后面试官提示是第一问没有implement的一个点，想到是时间排序最后写对了。
 第三问只有五分钟了，就讲了下思路。。不过面试官一直在给予肯定
 """
+
+monetary_columns = ('ad_delivery_pennies','payment_pennies')
+transactions = {
+'ff8bc1c2-8d45-11e9-bc42-526af7764f64': {'user_id': 1, 'ad_delivery_pennies': 1000, 'transaction_timestamp': 1500000001},
+'ff8bc2e4-8d45-11e9-bc42-526af7764f64': {'user_id': 1, 'ad_delivery_pennies': 1000, 'transaction_timestamp': 1500000002},
+'ff8bc4ec-8d45-11e9-bc42-526af7764f64': {'user_id': 1, 'payment_pennies': 500, 'transaction_timestamp': 1500000003},
+'fv24z4ec-8d45-11e9-bc42-526af7764f64': {'user_id': 1, 'ad_delivery_pennies': 1000, 'payment_pennies': 500, 'transaction_timestamp': 1500000004}
+}
+
+
+from typing import Dict, Iterable, Any, Tuple, List
+
+
+class BillingStatus:
+    """Running billing status for a single user."""
+    def __init__(self) -> None:
+        self.values = {}
+        # transations have done and took effect
+        self.appied_stack: List[Dict[str, Any]] = []
+        # transations have undone, could be redo
+        self.undone_stack: List[Dict[str, Any]] = []
+
+    @classmethod
+    def with_columns(cls, monetary_columns: Iterable[str]) -> 'BillingStatus':
+        """Create a BillingStatus with specified monetary columns initialized to 0."""
+        bs = cls()
+        for col in monetary_columns:
+            bs.values[col] = 0
+        return bs
+    
+    def reserve_effects(self, effects: Dict[str, Any]) -> None:
+        for col, e in effects.items():
+            if e["op"] == "add":
+                self.values[col] -= e["delta"]
+            elif e["op"] == "set":
+                self.values[col] = e["prev"]
+            else:
+                raise ValueError(f"Unknown operation {e['op']} for column {col}")
+            
+    def apply_effects(self, effects: Dict[str, Any]) -> None:
+        for col, e in effects.items():
+            if e["op"] == "add":
+                self.values[col] += e["val"]
+            elif e["op"] == "set":
+                self.values[col] -= e["new"]
+            else:
+                raise ValueError(f"Unknown operation {e['op']} for column {col}")
+    
+    def reverse_transaction(self, tx: Dict[str, Any], monetary_columns:Iterable[str]) -> None:
+        """Reverse a single transaction by subtracting its monetary column from the current totals"""
+        overwrite = tx.get('overwrite', False)
+        for col in monetary_columns:
+            if col in tx:
+                if overwrite:
+                    self.values[col] = tx.get('val_before_overwrite', 0)
+                else:
+                    self.values[col] -= int(tx[col])
+    
+    def ingest_transaction(self, tx: Dict[str, Any], monetary_columns:Iterable[str]) -> None:
+        """Apply a single transaction by adding its monerary column to the current totals"""
+        overwrite = tx.get('overwrite', False)
+        redo_last = tx.get('redo_last', False)
+        undo_last = tx.get('undo_last', False)
+        if undo_last:
+            if not self.applied_stack:
+                return
+            rec = self.applied_stack.pop()
+            self.reserve_effects(rec)
+            self.undone_stack.append(rec)
+            return
+        
+        if redo_last:
+            if not self.undone_stack:
+                return
+            rec = self.undone_stack.pop()
+            self.apply_effects(rec)
+            self.applied_stack.append(rec)
+            return
+        
+        effects: Dict[str, Any] = {}
+        for col in monetary_columns:
+            if col in tx:
+                if overwrite:
+                    prev = self.values[col]
+                    self.values[col] = int(tx[col])
+                    effects[col] = {
+                        "op": "set",
+                        "prev": prev,
+                        "new": int(tx[col]),
+                    }
+                else:
+                    self.values[col] += int(tx[col])
+                    effects[col] = {
+                        "op": "add",
+                        "delta": int(tx[col]),
+                        "val": int(tx[col])
+                    }
+        if effects:
+            self.applied_stack.append(effects)
+            self.undone_stack.clear()
+
+    def __repr__(self) -> str:
+        cols = ", ".join(f"'{k}'={v}" for k, v in self.values.items())
+        return f"BillingStatus({cols})"
+    
+
+def build_billing_status_by_user(
+        transactions: Dict[str, Dict[str, Any]],
+        monetary_columns: Tuple[str, ...]) -> Dict[int, BillingStatus]:
+    """
+    Build {user_id: BillingStatus} from transation logs.
+    Only additive updates; overwrite transactions.
+
+    Time complexity: sorting dominates → O(n log n) for n transactions;
+    ingest is O(n * m) where m=len(monetary_columns).
+    """
+    ordered: List[Tuple[str, Dict[str, Any]]] = sorted(
+        transactions.items(),
+        key=lambda item: item[1]['transaction_timestamp']
+    )
+    result: Dict[int, BillingStatus] = {}
+    for _, tx in ordered:
+        user_id = tx['user_id']
+        if user_id not in result:
+            result[user_id] = BillingStatus.with_columns(monetary_columns)
+        result[user_id].ingest_transaction(tx, monetary_columns)
+    return result
+
+
+
+
+
+if __name__ == "__main__":
+    monetary_columns = ("ad_delivery_pennies", "payment_pennies")
+    transactions = {
+        "ff8bc1c2-8d45-11e9-bc42-526af7764f64": {
+            "user_id": 1, "ad_delivery_pennies": 1000, "transaction_timestamp": 1500000001
+        },
+        "ff8bc2e4-8d45-11e9-bc42-526af7764f64": {
+            "user_id": 1, "ad_delivery_pennies": 1000, "transaction_timestamp": 1500000002
+        },
+        "ff8bc4ec-8d45-11e9-bc42-526af7764f64": {
+            "user_id": 1, "payment_pennies": 500, "transaction_timestamp": 1500000003
+        },
+        "fv24z4ec-8d45-11e9-bc42-526af7764f64": {
+            "user_id": 1, "ad_delivery_pennies": 1000, "payment_pennies": 500, "transaction_timestamp": 1500000004
+        },
+    }
+
+    out = build_billing_status_by_user(transactions, monetary_columns)
+    print(out)
+
+    transactions2 = {
+        "ff8ba98a-8d45-11e9-bc42-526af7764f64": {
+            "user_id": 1,
+            "ad_delivery_pennies": 1000,
+            "transaction_timestamp": 1500000001,
+            "overwrite": False,
+        },
+        "ff8bad4a-8d45-11e9-bc42-526af7764f64": {
+            "user_id": 2,
+            "ad_delivery_pennies": 1000,
+            "transaction_timestamp": 1500000004,
+        },
+        "ff8baea8-8d45-11e9-bc42-526af7764f64": {
+            "user_id": 2,
+            "payment_pennies": 600,
+            "transaction_timestamp": 1500000007,
+            "overwrite": False,
+        },
+        "ff8bb4ac-8d45-11e9-bc42-526af7764f64": {
+            "user_id": 1,
+            "ad_delivery_pennies": 1000,
+            "transaction_timestamp": 1500000002,
+            "overwrite": False,
+        },
+        "ff8bb600-8d45-11e9-bc42-526af7764f64": {
+            "user_id": 2,
+            "ad_delivery_pennies": 1000,
+            "payment_pennies": 500,
+            "transaction_timestamp": 1500000003,
+            "overwrite": False,
+        },
+        "ff8bb89e-8d45-11e9-bc42-526af7764f64": {
+            "user_id": 2,
+            "payment_pennies": 2000,
+            "transaction_timestamp": 1500000005,
+            "overwrite": True,
+        },
+        "ff8bb9c0-8d45-11e9-bc42-526af7764f64": {
+            "user_id": 1,
+            "payment_pennies": 500,
+            "transaction_timestamp": 1500000003,
+            "overwrite": False,
+        },
+        "ff8bbf74-8d45-11e9-bc42-526af7764f64": {
+            "user_id": 1,
+            "ad_delivery_pennies": 1000,
+            "payment_pennies": 500,
+            "transaction_timestamp": 1500000004,
+            "overwrite": True,
+        },
+        "ff8bc0a0-8d45-11e9-bc42-526af7764f64": {
+            "user_id": 2,
+            "ad_delivery_pennies": 1000,
+            "transaction_timestamp": 1500000001,
+        },
+        "ff8bc1c2-8d45-11e9-bc42-526af7764f64": {
+            "user_id": 2,
+            "ad_delivery_pennies": 1000,
+            "transaction_timestamp": 1500000002,
+        },
+        "ff923488-8d45-11e9-bc42-526af7764f64": {
+            "user_id": 1,
+            "payment_pennies": 100,
+            "transaction_timestamp": 1500000013,
+        },
+    }
+
+    out2 = build_billing_status_by_user(transactions2, monetary_columns)
+    print(out2)

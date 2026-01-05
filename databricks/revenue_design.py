@@ -38,4 +38,6 @@ Estimate the server loads.
 insert(revenue): 返回一个auto-increment的customer id
 insert(revenue, referrer): 返回一个auto-increment的customer id，和1的不同是这个新的customer是被referrer refer的
 get_top_k_revenue(k, min_revenue) -> set[int]: 返回有topk revenue的customer，但是要满足revenue 不小于min_revenue。每个customer的revenue是自己的revenue和被他直接refer的customer的revenue总和。
+---
+
 """
