@@ -28,3 +28,61 @@ The solution uses a list to store all timestamps and binary search (bisect_left)
 如何chunk数据，可以统计一个time range
 """
 
+"""
+This gives O(1) hit and O(300)=O(1) getHits, and constant memory.
+To handle overflow: use int64 counters/timestamps
+To support arbitrary time-range queries,
+ I’d aggregate by second and maintain prefix sums + binary search, 
+ or use multi-resolution buckets for longer windows.
+"""
+import threading
+
+class HitCounter:
+    WINDOW = 300
+
+    def __init__(self):
+        self.times = [0] * self.WINDOW
+        self.hits = [0] * self.WINDOW
+
+    def hit(self, timestamp: int) -> None:
+        i = timestamp % self.WINDOW
+        # if timestamp changes, update with most recent timestamp
+        if self.times[i] != timestamp:
+            self.times[i] = timestamp
+            self.hits[i] = 1
+        else:
+            self.hits[i] += 1
+    
+    def get_hits(self, timestamp: int) -> int:
+        total = 0
+        for i in range(self.WINDOW):
+            if timestamp - self.times[i] < self.WINDOW:
+                total += self.hits[i]
+        return total
+    
+class HitCounterSafe:
+    WINDOW = 300
+
+    def __init__(self):
+        self.times = [0] * self.WINDOW
+        self.hits = [0] * self.WINDOW
+        self._lock = threading.Lock()
+
+    def hit(self, timestamp: int) -> None:
+        with self._lock:
+            i = timestamp % self.WINDOW
+            if self.times[i] != timestamp:
+                self.times[i] = timestamp
+                self.hits[i] = 1
+            else:
+                self.hits[i] += 1
+            
+    
+    def get_hits(self, timestamp: int) -> int:
+        with self._lock:
+            total = 0
+            for i in range(self.WINDOW):
+                if timestamp - self.times[i] < self.WINDOW:
+                    total += self.hits[i]
+            return total
+

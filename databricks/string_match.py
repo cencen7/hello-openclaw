@@ -14,12 +14,54 @@ anagram_index(‘databricks’, ‘atd’) 应该返回0，如果query改成sk �
 coding ref string和source string，
 找出ref string里面index可以match上source string的所有pair输出，
 第二问是，如果delete其中一个char，怎么改变第一问输出的pair，前提是要保持maximum cover，
-注意不是optimal cover。第二个coding是BFS找最节约的交通方式in 2D matrix， 
-每个grid有cost，每种交通方式不可以互换，比如bike，walk，bus是三种cost，
-一但选择了就不可以换成另一种交通，比较基础的BFS
+注意不是optimal cover。
 ---
 https://leetcode.com/discuss/post/897537/facebook-phone-anagram-substring-search-kpaiq/
 
 --
 https://leetcode.com/problems/number-of-matching-subsequences/description/ 
 """
+
+
+class FindSubStr:
+    def __init__(self, word):
+        self.word = word
+        self.chars = list(word.lower())
+
+    def _is_anagram(self, chars1, chars2):
+        count = {}
+        for c in chars1:
+            count[c] = count.get(c, 0) + 1
+        for c in chars2:
+            if count.get(c, 0) == 0:
+                return False
+            count[c] -= 1
+        return True
+
+    def find_substr(self, substr):
+        if len(substr) == 0:
+            return 0
+        
+        if len(substr) > len(self.word):
+            return -1
+        
+        substr_chars = list(substr.lower())
+        for i in range(0, len(self.word) - len(substr) + 1):
+            tmp = self.chars[i:i+len(substr)]
+            if self._is_anagram(tmp, substr_chars):
+                return i
+            
+        return -1
+    
+if __name__ == "__main__":
+    fs = FindSubStr("databricks")
+    print(fs.find_substr("tad"))  # 0
+    print(fs.find_substr("ribkc"))  # 4
+    print(fs.find_substr("abc"))  # -1
+    print(fs.find_substr("data"))  # 0
+    print(fs.find_substr(""))  # 0
+    print(fs.find_substr("databricksx"))  # -1
+        
+        
+       
+
